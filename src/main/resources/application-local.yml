@@ -1,0 +1,16 @@
+telegram:
+  bot:
+    token: "YOUR_BOT_TOKEN_HERE"
+    username: "your_bot_username"
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/osbb_bot
+    username: postgres
+    password: postgres
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    ua.horuktaras: DEBUG

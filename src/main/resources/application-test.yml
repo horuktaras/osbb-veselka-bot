@@ -1,0 +1,11 @@
+spring:
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+telegram:
+  bot:
+    token: "test-token"
+    username: "test_bot"
