@@ -58,7 +58,12 @@ public class ModerationService {
                 Instant until = Instant.now().plus(duration);
                 ChatPermissions noPermissions = ChatPermissions.builder()
                         .canSendMessages(false)
-                        .canSendMediaMessages(false)
+                        .canSendAudios(false)
+                        .canSendDocuments(false)
+                        .canSendPhotos(false)
+                        .canSendVideos(false)
+                        .canSendVideoNotes(false)
+                        .canSendVoiceNotes(false)
                         .canSendOtherMessages(false)
                         .canAddWebPagePreviews(false)
                         .build();
@@ -82,7 +87,12 @@ public class ModerationService {
     public ModerationResult muteUser(Long chatId, Long adminId, Long targetId, Duration duration, String reason, TelegramClient client) {
         ChatPermissions noPermissions = ChatPermissions.builder()
                 .canSendMessages(false)
-                .canSendMediaMessages(false)
+                .canSendAudios(false)
+                .canSendDocuments(false)
+                .canSendPhotos(false)
+                .canSendVideos(false)
+                .canSendVideoNotes(false)
+                .canSendVoiceNotes(false)
                 .canSendOtherMessages(false)
                 .canAddWebPagePreviews(false)
                 .build();

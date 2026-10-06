@@ -2,7 +2,6 @@ package ua.horuktaras.osbb.bot.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ua.horuktaras.osbb.bot.model.entity.ProcessedUpdate;
@@ -33,7 +32,6 @@ public class UpdateIdempotencyService {
         }
     }
 
-    @Scheduled(fixedDelay = 3600000) // every hour
     @Transactional
     public void cleanupOldEntries() {
         Instant cutoff = Instant.now().minusSeconds(86400); // 24 hours

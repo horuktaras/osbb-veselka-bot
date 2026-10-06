@@ -48,7 +48,12 @@ public class TelegramApiService {
     public boolean unrestrictUser(Long chatId, Long userId) {
         ChatPermissions fullPermissions = ChatPermissions.builder()
                 .canSendMessages(true)
-                .canSendMediaMessages(true)
+                .canSendAudios(true)
+                .canSendDocuments(true)
+                .canSendPhotos(true)
+                .canSendVideos(true)
+                .canSendVideoNotes(true)
+                .canSendVoiceNotes(true)
                 .canSendOtherMessages(true)
                 .canAddWebPagePreviews(true)
                 .canSendPolls(true)
