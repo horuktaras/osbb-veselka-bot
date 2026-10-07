@@ -1,7 +1,7 @@
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM gradle:8.11-jdk21-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN ./gradlew bootJar --no-daemon
+RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S botgroup && adduser -S botuser -G botgroup

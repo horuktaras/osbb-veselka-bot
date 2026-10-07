@@ -9,3 +9,4 @@ telegram:
   bot:
     token: "test-token"
     username: "test_bot"
+    admin-chat-id: "-100000000000"

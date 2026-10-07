@@ -2,6 +2,7 @@ telegram:
   bot:
     token: ${BOT_TOKEN}
     username: ${BOT_USERNAME}
+    admin-chat-id: ${ADMIN_CHAT_ID}
 
 spring:
   application:
@@ -28,7 +29,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       show-details: always

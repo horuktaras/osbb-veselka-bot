@@ -8,5 +8,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public record BotProperties(
         @NotBlank String token,
-        @NotBlank String username
+        @NotBlank String username,
+        @NotBlank String adminChatId
 ) {}

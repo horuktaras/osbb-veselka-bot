@@ -1,7 +1,8 @@
 telegram:
   bot:
-    token: "YOUR_BOT_TOKEN_HERE"
-    username: "your_bot_username"
+    token: ${BOT_TOKEN}
+    username: ${BOT_USERNAME}
+    admin-chat-id: ${ADMIN_CHAT_ID}
 
 spring:
   datasource:
