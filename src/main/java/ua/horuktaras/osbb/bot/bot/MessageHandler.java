@@ -15,6 +15,7 @@ import ua.horuktaras.osbb.bot.model.dto.RequestDraft;
 import ua.horuktaras.osbb.bot.model.entity.Request;
 import ua.horuktaras.osbb.bot.model.enums.ConversationStep;
 import ua.horuktaras.osbb.bot.model.enums.MediaType;
+import ua.horuktaras.osbb.bot.service.AdminBoardService;
 import ua.horuktaras.osbb.bot.service.AdminNotificationService;
 import ua.horuktaras.osbb.bot.service.ConversationService;
 import ua.horuktaras.osbb.bot.service.RequestService;
@@ -32,15 +33,18 @@ public class MessageHandler {
     private final ConversationService conversationService;
     private final RequestService requestService;
     private final AdminNotificationService adminNotificationService;
+    private final AdminBoardService adminBoardService;
 
     public MessageHandler(TelegramClient telegramClient,
                           ConversationService conversationService,
                           RequestService requestService,
-                          AdminNotificationService adminNotificationService) {
+                          AdminNotificationService adminNotificationService,
+                          AdminBoardService adminBoardService) {
         this.telegramClient = telegramClient;
         this.conversationService = conversationService;
         this.requestService = requestService;
         this.adminNotificationService = adminNotificationService;
+        this.adminBoardService = adminBoardService;
     }
 
     public void handle(Message message) {
@@ -84,6 +88,14 @@ public class MessageHandler {
                     cancelDraft(chatId, userId);
                 } else {
                     send(chatId, "Немає активної заявки для скасування.");
+                }
+            }
+            case "/board" -> {
+                if (adminBoardService.isAdmin(userId)) {
+                    AdminBoardService.BoardMessage boardMsg = adminBoardService.buildBoardMessage(0, "ALL");
+                    sendWithKeyboard(chatId, boardMsg.text(), boardMsg.keyboard());
+                } else {
+                    send(chatId, "❌ Доступ заборонено.");
                 }
             }
             default -> send(chatId, "Невідома команда. Натисніть /start щоб подати заявку.");

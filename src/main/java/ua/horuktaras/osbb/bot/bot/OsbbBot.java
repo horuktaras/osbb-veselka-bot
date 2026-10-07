@@ -43,6 +43,10 @@ public class OsbbBot implements SpringLongPollingBot {
                             BotCommand.builder()
                                     .command("cancel")
                                     .description("Скасувати поточну заявку")
+                                    .build(),
+                            BotCommand.builder()
+                                    .command("board")
+                                    .description("Панель заявок")
                                     .build()
                     ))
                     .scope(BotCommandScopeAllPrivateChats.builder().build())
