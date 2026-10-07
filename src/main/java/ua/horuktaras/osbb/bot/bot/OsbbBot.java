@@ -41,10 +41,6 @@ public class OsbbBot implements SpringLongPollingBot {
                                     .description("Подати нову заявку")
                                     .build(),
                             BotCommand.builder()
-                                    .command("cancel")
-                                    .description("Скасувати поточну заявку")
-                                    .build(),
-                            BotCommand.builder()
                                     .command("board")
                                     .description("Панель заявок")
                                     .build()
