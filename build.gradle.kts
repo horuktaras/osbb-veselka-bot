@@ -34,6 +34,9 @@ dependencies {
     // PostgreSQL driver
     runtimeOnly("org.postgresql:postgresql")
 
+    // Caffeine cache (version managed by Spring Boot BOM)
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     // TelegramBots (9.5.0) - use BOM platform for consistent versioning
     implementation(platform("org.telegram:telegrambots-bom:$telegramBotsVersion"))
     implementation("org.telegram:telegrambots-springboot-longpolling-starter:$telegramBotsVersion")

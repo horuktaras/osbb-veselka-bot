@@ -5,4 +5,4 @@ build/
 .gitignore
 .env
 docker-compose.yml
-pom.xml
+pom.xm/

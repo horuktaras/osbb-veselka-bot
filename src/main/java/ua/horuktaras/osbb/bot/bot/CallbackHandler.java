@@ -64,6 +64,8 @@ public class CallbackHandler {
             handleConfirmation(callback, data, userId, chatId);
         } else if (data.startsWith("board:")) {
             handleBoardCallback(callback, data, userId, chatId);
+        } else if (data.startsWith("duplicate:")) {
+            handleDuplicateConfirm(callback, data, userId, chatId);
         }
 
         answerCallback(callback.getId());
@@ -235,6 +237,19 @@ public class CallbackHandler {
 
         if (data.equals("confirm:yes")) {
             messageHandler.confirmAndSubmit(chatId, draftOpt.get());
+        } else {
+            messageHandler.cancelDraft(chatId, userId);
+        }
+    }
+
+    private void handleDuplicateConfirm(CallbackQuery callback, String data, Long userId, Long chatId) {
+        Optional<RequestDraft> draftOpt = conversationService.getDraft(userId);
+        if (draftOpt.isEmpty() || draftOpt.get().getStep() != ConversationStep.AWAITING_DUPLICATE_CONFIRM) return;
+
+        if ("duplicate:submit".equals(data)) {
+            RequestDraft draft = draftOpt.get();
+            draft.setStep(ConversationStep.AWAITING_MEDIA);
+            messageHandler.sendMediaKeyboardForDraft(chatId);
         } else {
             messageHandler.cancelDraft(chatId, userId);
         }

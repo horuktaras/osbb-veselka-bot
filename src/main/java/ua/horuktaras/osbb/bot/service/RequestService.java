@@ -6,6 +6,8 @@ import ua.horuktaras.osbb.bot.model.entity.Request;
 import ua.horuktaras.osbb.bot.model.enums.RequestStatus;
 import ua.horuktaras.osbb.bot.repository.RequestRepository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -24,6 +26,10 @@ public class RequestService {
 
     public Optional<Request> findById(Long id) {
         return repository.findById(id);
+    }
+
+    public List<Request> findOpenSince(LocalDateTime since) {
+        return repository.findOpenSince(since);
     }
 
     public Request updateStatus(Long id, RequestStatus newStatus) {

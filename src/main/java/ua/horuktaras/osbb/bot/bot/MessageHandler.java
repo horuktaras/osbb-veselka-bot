@@ -17,12 +17,16 @@ import ua.horuktaras.osbb.bot.model.enums.ConversationStep;
 import ua.horuktaras.osbb.bot.model.enums.MediaType;
 import ua.horuktaras.osbb.bot.service.AdminBoardService;
 import ua.horuktaras.osbb.bot.service.AdminNotificationService;
+import ua.horuktaras.osbb.bot.service.AiDuplicateService;
 import ua.horuktaras.osbb.bot.service.ConversationService;
 import ua.horuktaras.osbb.bot.service.RequestService;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 public class MessageHandler {
@@ -34,17 +38,20 @@ public class MessageHandler {
     private final RequestService requestService;
     private final AdminNotificationService adminNotificationService;
     private final AdminBoardService adminBoardService;
+    private final AiDuplicateService aiDuplicateService;
 
     public MessageHandler(TelegramClient telegramClient,
                           ConversationService conversationService,
                           RequestService requestService,
                           AdminNotificationService adminNotificationService,
-                          AdminBoardService adminBoardService) {
+                          AdminBoardService adminBoardService,
+                          AiDuplicateService aiDuplicateService) {
         this.telegramClient = telegramClient;
         this.conversationService = conversationService;
         this.requestService = requestService;
         this.adminNotificationService = adminNotificationService;
         this.adminBoardService = adminBoardService;
+        this.aiDuplicateService = aiDuplicateService;
     }
 
     public void handle(Message message) {
@@ -150,8 +157,48 @@ public class MessageHandler {
             return;
         }
         draft.setDescription(text.trim());
-        draft.setStep(ConversationStep.AWAITING_MEDIA);
-        sendMediaKeyboard(message.getChatId());
+
+        List<Request> recentOpen = requestService.findOpenSince(LocalDateTime.now().minusDays(10));
+        List<Long> similarIds = aiDuplicateService.findSimilar(draft.getDescription(), draft.getType().name(), recentOpen);
+
+        if (!similarIds.isEmpty()) {
+            draft.setStep(ConversationStep.AWAITING_DUPLICATE_CONFIRM);
+            sendDuplicateWarning(message.getChatId(), similarIds, recentOpen);
+        } else {
+            draft.setStep(ConversationStep.AWAITING_MEDIA);
+            sendMediaKeyboard(message.getChatId());
+        }
+    }
+
+    private void sendDuplicateWarning(Long chatId, List<Long> similarIds, List<Request> allRecent) {
+        Map<Long, Request> byId = allRecent.stream().collect(Collectors.toMap(Request::getId, r -> r));
+
+        StringBuilder sb = new StringBuilder("⚠️ <b>Схожі заявки вже існують:</b>\n\n");
+        for (Long id : similarIds) {
+            Request r = byId.get(id);
+            if (r == null) continue;
+            String desc = r.getDescription().length() > 60
+                    ? r.getDescription().substring(0, 60) + "..."
+                    : r.getDescription();
+            sb.append("#").append(r.getId())
+              .append(" ").append(r.getType().getDisplayName())
+              .append(" — <i>\"").append(escapeHtml(desc)).append("\"</i>")
+              .append(" (").append(r.getStatus().getDisplayName()).append(")\n");
+        }
+        sb.append("\nМожливо, вашу проблему вже зареєстровано.\n\nВсе одно подати нову заявку?");
+
+        InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(
+                        InlineKeyboardButton.builder().text("✅ Так, подати").callbackData("duplicate:submit").build(),
+                        InlineKeyboardButton.builder().text("❌ Скасувати").callbackData("duplicate:cancel").build()
+                ))
+                .build();
+        sendWithKeyboard(chatId, sb.toString(), keyboard);
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private void handleMedia(RequestDraft draft, Message message) {
@@ -194,6 +241,8 @@ public class MessageHandler {
         request.setMediaFileId(draft.getMediaFileId());
         request.setMediaType(draft.getMediaType());
 
+        conversationService.removeDraft(draft.getUserId());
+
         Request saved = requestService.save(request);
 
         Integer messageId = adminNotificationService.sendNewRequest(saved);
@@ -201,8 +250,6 @@ public class MessageHandler {
             saved.setAdminChatMessageId(messageId.longValue());
             requestService.save(saved);
         }
-
-        conversationService.removeDraft(draft.getUserId());
         send(chatId, "✅ Вашу заявку <b>#" + saved.getId() + "</b> прийнято!\n\nАдміністрація ОСББ розгляне її найближчим часом.");
     }
 
@@ -261,6 +308,10 @@ public class MessageHandler {
                 .build();
 
         sendWithKeyboard(chatId, text, keyboard);
+    }
+
+    public void sendMediaKeyboardForDraft(Long chatId) {
+        sendMediaKeyboard(chatId);
     }
 
     public void sendTypeKeyboardForDraft(Long chatId) {

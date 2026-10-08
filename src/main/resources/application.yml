@@ -34,6 +34,10 @@ management:
     health:
       show-details: always
 
+groq:
+  api-key: ${GROQ_API_KEY:}
+  model: ${GROQ_MODEL:llama-3.3-70b-versatile}
+
 logging:
   level:
     ua.horuktaras: INFO
