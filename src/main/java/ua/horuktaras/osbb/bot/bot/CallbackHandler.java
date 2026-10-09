@@ -4,11 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
-import org.telegram.telegrambots.meta.api.methods.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ua.horuktaras.osbb.bot.model.dto.RequestDraft;
@@ -111,7 +112,7 @@ public class CallbackHandler {
         }
 
         Integer messageId = callback.getMessage().getMessageId();
-        boolean isMedia = callback.getMessage().hasPhoto() || callback.getMessage().hasVideo();
+        boolean isMedia = callback.getMessage() instanceof Message m && (m.hasPhoto() || m.hasVideo());
         adminStatusCommentService.store(userId, requestId, newStatus, chatId, messageId, isMedia);
 
         // Edit the current message to ask about a comment
@@ -229,7 +230,7 @@ public class CallbackHandler {
             String filter = parts[2];
 
             AdminBoardService.BoardMessage boardMsg = adminBoardService.buildBoardMessage(page, filter);
-            boolean isMediaMessage = callback.getMessage().hasPhoto() || callback.getMessage().hasVideo();
+            boolean isMediaMessage = callback.getMessage() instanceof Message m && (m.hasPhoto() || m.hasVideo());
             if (isMediaMessage) {
                 // Coming back from a media detail — delete it, send new text board list
                 telegramClient.execute(DeleteMessage.builder().chatId(chatId).messageId(messageId).build());
