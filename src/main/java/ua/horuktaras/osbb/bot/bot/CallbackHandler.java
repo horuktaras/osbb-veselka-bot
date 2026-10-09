@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
+import org.telegram.telegrambots.meta.api.methods.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -109,7 +111,8 @@ public class CallbackHandler {
         }
 
         Integer messageId = callback.getMessage().getMessageId();
-        adminStatusCommentService.store(userId, requestId, newStatus, chatId, messageId);
+        boolean isMedia = callback.getMessage().hasPhoto() || callback.getMessage().hasVideo();
+        adminStatusCommentService.store(userId, requestId, newStatus, chatId, messageId, isMedia);
 
         // Edit the current message to ask about a comment
         String promptText = "💬 Зміна статусу на <b>" + newStatus.getDisplayName() + "</b>\n\nДодати коментар?";
@@ -123,13 +126,17 @@ public class CallbackHandler {
                         ))
                         .build();
         try {
-            telegramClient.execute(EditMessageText.builder()
-                    .chatId(chatId)
-                    .messageId(messageId)
-                    .text(promptText)
-                    .parseMode("HTML")
-                    .replyMarkup(keyboard)
-                    .build());
+            if (isMedia) {
+                telegramClient.execute(EditMessageCaption.builder()
+                        .chatId(chatId).messageId(messageId)
+                        .caption(promptText).parseMode("HTML")
+                        .replyMarkup(keyboard).build());
+            } else {
+                telegramClient.execute(EditMessageText.builder()
+                        .chatId(chatId).messageId(messageId)
+                        .text(promptText).parseMode("HTML")
+                        .replyMarkup(keyboard).build());
+            }
         } catch (TelegramApiException e) {
             log.warn("Failed to edit message for comment prompt", e);
         }
@@ -147,14 +154,19 @@ public class CallbackHandler {
             adminStatusCommentService.remove(userId);
             answerCallbackWithText(callback.getId(), "Статус змінено.");
         } else if ("scomment:write".equals(data)) {
+            AdminStatusCommentService.PendingStatusChange pending = pendingOpt.get();
             adminStatusCommentService.setAwaitingText(userId);
+            String writePrompt = "✏️ Напишіть коментар до заявки <b>#" + pending.requestId() + "</b>:";
             try {
-                telegramClient.execute(EditMessageText.builder()
-                        .chatId(chatId)
-                        .messageId(callback.getMessage().getMessageId())
-                        .text("✏️ Напишіть коментар до заявки <b>#" + pendingOpt.get().requestId() + "</b>:")
-                        .parseMode("HTML")
-                        .build());
+                if (pending.mediaMessage()) {
+                    telegramClient.execute(EditMessageCaption.builder()
+                            .chatId(chatId).messageId(callback.getMessage().getMessageId())
+                            .caption(writePrompt).parseMode("HTML").build());
+                } else {
+                    telegramClient.execute(EditMessageText.builder()
+                            .chatId(chatId).messageId(callback.getMessage().getMessageId())
+                            .text(writePrompt).parseMode("HTML").build());
+                }
             } catch (TelegramApiException e) {
                 log.warn("Failed to edit message for comment input", e);
             }
@@ -190,14 +202,19 @@ public class CallbackHandler {
                     return;
                 }
 
-                AdminBoardService.BoardMessage boardMsg = adminBoardService.buildDetailMessage(requestOpt.get(), returnPage, returnFilter);
-                telegramClient.execute(EditMessageText.builder()
-                        .chatId(chatId)
-                        .messageId(messageId)
-                        .text(boardMsg.text())
-                        .parseMode("HTML")
-                        .replyMarkup(boardMsg.keyboard())
-                        .build());
+                Request request = requestOpt.get();
+                AdminBoardService.BoardMessage boardMsg = adminBoardService.buildDetailMessage(request, returnPage, returnFilter);
+
+                if (request.getMediaFileId() != null) {
+                    // Delete current board list message, send media with detail as caption
+                    telegramClient.execute(DeleteMessage.builder().chatId(chatId).messageId(messageId).build());
+                    statusChangeService.sendMediaDetail(chatId, request, boardMsg);
+                } else {
+                    telegramClient.execute(EditMessageText.builder()
+                            .chatId(chatId).messageId(messageId)
+                            .text(boardMsg.text()).parseMode("HTML")
+                            .replyMarkup(boardMsg.keyboard()).build());
+                }
             } catch (Exception e) {
                 log.warn("Failed to handle board view callback: {}", data, e);
             }
@@ -212,13 +229,19 @@ public class CallbackHandler {
             String filter = parts[2];
 
             AdminBoardService.BoardMessage boardMsg = adminBoardService.buildBoardMessage(page, filter);
-            telegramClient.execute(EditMessageText.builder()
-                    .chatId(chatId)
-                    .messageId(messageId)
-                    .text(boardMsg.text())
-                    .parseMode("HTML")
-                    .replyMarkup(boardMsg.keyboard())
-                    .build());
+            boolean isMediaMessage = callback.getMessage().hasPhoto() || callback.getMessage().hasVideo();
+            if (isMediaMessage) {
+                // Coming back from a media detail — delete it, send new text board list
+                telegramClient.execute(DeleteMessage.builder().chatId(chatId).messageId(messageId).build());
+                telegramClient.execute(SendMessage.builder()
+                        .chatId(chatId).text(boardMsg.text()).parseMode("HTML")
+                        .replyMarkup(boardMsg.keyboard()).build());
+            } else {
+                telegramClient.execute(EditMessageText.builder()
+                        .chatId(chatId).messageId(messageId)
+                        .text(boardMsg.text()).parseMode("HTML")
+                        .replyMarkup(boardMsg.keyboard()).build());
+            }
         } catch (Exception e) {
             log.warn("Failed to handle board list callback: {}", data, e);
         }

@@ -19,15 +19,16 @@ public class AdminStatusCommentService {
             RequestStatus newStatus,
             Long chatId,
             Integer messageId,
-            boolean awaitingText
+            boolean awaitingText,
+            boolean mediaMessage
     ) {
         public PendingStatusChange withAwaitingText() {
-            return new PendingStatusChange(requestId, newStatus, chatId, messageId, true);
+            return new PendingStatusChange(requestId, newStatus, chatId, messageId, true, mediaMessage);
         }
     }
 
-    public void store(Long adminId, Long requestId, RequestStatus newStatus, Long chatId, Integer messageId) {
-        pending.put(adminId, new PendingStatusChange(requestId, newStatus, chatId, messageId, false));
+    public void store(Long adminId, Long requestId, RequestStatus newStatus, Long chatId, Integer messageId, boolean mediaMessage) {
+        pending.put(adminId, new PendingStatusChange(requestId, newStatus, chatId, messageId, false, mediaMessage));
     }
 
     public Optional<PendingStatusChange> get(Long adminId) {

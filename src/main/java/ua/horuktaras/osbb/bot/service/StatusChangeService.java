@@ -3,10 +3,15 @@ package ua.horuktaras.osbb.bot.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ua.horuktaras.osbb.bot.model.entity.Request;
+import ua.horuktaras.osbb.bot.model.enums.MediaType;
 import ua.horuktaras.osbb.bot.model.enums.RequestStatus;
 import ua.horuktaras.osbb.bot.service.AdminStatusCommentService.PendingStatusChange;
 
@@ -46,16 +51,45 @@ public class StatusChangeService {
         } else {
             AdminBoardService.BoardMessage boardMsg = adminBoardService.buildDetailMessage(updated, 0, "ALL");
             try {
-                telegramClient.execute(EditMessageText.builder()
-                        .chatId(pending.chatId())
-                        .messageId(pending.messageId())
-                        .text(boardMsg.text())
-                        .parseMode("HTML")
-                        .replyMarkup(boardMsg.keyboard())
-                        .build());
+                if (pending.mediaMessage()) {
+                    telegramClient.execute(DeleteMessage.builder()
+                            .chatId(pending.chatId()).messageId(pending.messageId()).build());
+                    sendMediaDetail(pending.chatId(), updated, boardMsg);
+                } else {
+                    telegramClient.execute(EditMessageText.builder()
+                            .chatId(pending.chatId())
+                            .messageId(pending.messageId())
+                            .text(boardMsg.text())
+                            .parseMode("HTML")
+                            .replyMarkup(boardMsg.keyboard())
+                            .build());
+                }
             } catch (TelegramApiException e) {
                 log.warn("Failed to update board message after status change", e);
             }
+        }
+    }
+
+    public void sendMediaDetail(Long chatId, Request request, AdminBoardService.BoardMessage boardMsg) throws TelegramApiException {
+        String caption = boardMsg.text().length() > 1024
+                ? boardMsg.text().substring(0, 1021) + "..."
+                : boardMsg.text();
+        if (request.getMediaType() == MediaType.PHOTO) {
+            telegramClient.execute(SendPhoto.builder()
+                    .chatId(chatId)
+                    .photo(new InputFile(request.getMediaFileId()))
+                    .caption(caption)
+                    .parseMode("HTML")
+                    .replyMarkup(boardMsg.keyboard())
+                    .build());
+        } else {
+            telegramClient.execute(SendVideo.builder()
+                    .chatId(chatId)
+                    .video(new InputFile(request.getMediaFileId()))
+                    .caption(caption)
+                    .parseMode("HTML")
+                    .replyMarkup(boardMsg.keyboard())
+                    .build());
         }
     }
 
