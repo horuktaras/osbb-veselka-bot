@@ -16,8 +16,10 @@ import ua.horuktaras.osbb.bot.model.enums.RequestStatus;
 import ua.horuktaras.osbb.bot.model.enums.RequestType;
 import ua.horuktaras.osbb.bot.service.AdminBoardService;
 import ua.horuktaras.osbb.bot.service.AdminNotificationService;
+import ua.horuktaras.osbb.bot.service.AdminStatusCommentService;
 import ua.horuktaras.osbb.bot.service.ConversationService;
 import ua.horuktaras.osbb.bot.service.RequestService;
+import ua.horuktaras.osbb.bot.service.StatusChangeService;
 
 import java.util.Optional;
 
@@ -32,19 +34,25 @@ public class CallbackHandler {
     private final AdminNotificationService adminNotificationService;
     private final AdminBoardService adminBoardService;
     private final MessageHandler messageHandler;
+    private final AdminStatusCommentService adminStatusCommentService;
+    private final StatusChangeService statusChangeService;
 
     public CallbackHandler(TelegramClient telegramClient,
                            ConversationService conversationService,
                            RequestService requestService,
                            AdminNotificationService adminNotificationService,
                            AdminBoardService adminBoardService,
-                           MessageHandler messageHandler) {
+                           MessageHandler messageHandler,
+                           AdminStatusCommentService adminStatusCommentService,
+                           StatusChangeService statusChangeService) {
         this.telegramClient = telegramClient;
         this.conversationService = conversationService;
         this.requestService = requestService;
         this.adminNotificationService = adminNotificationService;
         this.adminBoardService = adminBoardService;
         this.messageHandler = messageHandler;
+        this.adminStatusCommentService = adminStatusCommentService;
+        this.statusChangeService = statusChangeService;
     }
 
     public void handle(CallbackQuery callback) {
@@ -53,7 +61,9 @@ public class CallbackHandler {
         Long chatId = callback.getMessage().getChatId();
 
         if (data.startsWith("status:")) {
-            handleStatusChange(callback, data, chatId);
+            handleStatusChange(callback, data, userId, chatId);
+        } else if (data.startsWith("scomment:")) {
+            handleStatusComment(callback, data, userId, chatId);
         } else if (data.startsWith("urgency:")) {
             handleUrgency(callback, data, userId, chatId);
         } else if (data.startsWith("type:")) {
@@ -71,7 +81,7 @@ public class CallbackHandler {
         answerCallback(callback.getId());
     }
 
-    private void handleStatusChange(CallbackQuery callback, String data, Long chatId) {
+    private void handleStatusChange(CallbackQuery callback, String data, Long userId, Long chatId) {
         // data format: status:<requestId>:<newStatus>
         String[] parts = data.split(":");
         if (parts.length != 3) return;
@@ -93,37 +103,62 @@ public class CallbackHandler {
         }
 
         Request request = requestOpt.get();
-        if (!request.getStatus().nextStatuses().contains(newStatus)) {
+        if (!statusChangeService.isValidTransition(request, newStatus)) {
             answerCallbackWithText(callback.getId(), "Цей перехід статусу недоступний.");
             return;
         }
 
-        Request updated = requestService.updateStatus(requestId, newStatus);
-
         Integer messageId = callback.getMessage().getMessageId();
-        boolean isAdminNotificationMessage = updated.getAdminChatMessageId() != null
-                && updated.getAdminChatMessageId().equals(messageId.longValue());
+        adminStatusCommentService.store(userId, requestId, newStatus, chatId, messageId);
 
-        if (isAdminNotificationMessage) {
-            // Callback came from the original admin notification — let AdminNotificationService handle the edit
-            adminNotificationService.updateRequestMessage(updated);
-        } else {
-            // Callback came from a board detail view — re-render detail in place
-            AdminBoardService.BoardMessage boardMsg = adminBoardService.buildDetailMessage(updated, 0, "ALL");
+        // Edit the current message to ask about a comment
+        String promptText = "💬 Зміна статусу на <b>" + newStatus.getDisplayName() + "</b>\n\nДодати коментар?";
+        org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup keyboard =
+                org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup.builder()
+                        .keyboardRow(new org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow(
+                                org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton.builder()
+                                        .text("➡️ Пропустити").callbackData("scomment:skip").build(),
+                                org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton.builder()
+                                        .text("✏️ Написати").callbackData("scomment:write").build()
+                        ))
+                        .build();
+        try {
+            telegramClient.execute(EditMessageText.builder()
+                    .chatId(chatId)
+                    .messageId(messageId)
+                    .text(promptText)
+                    .parseMode("HTML")
+                    .replyMarkup(keyboard)
+                    .build());
+        } catch (TelegramApiException e) {
+            log.warn("Failed to edit message for comment prompt", e);
+        }
+    }
+
+    private void handleStatusComment(CallbackQuery callback, String data, Long userId, Long chatId) {
+        Optional<AdminStatusCommentService.PendingStatusChange> pendingOpt = adminStatusCommentService.get(userId);
+        if (pendingOpt.isEmpty()) {
+            answerCallbackWithText(callback.getId(), "Сесія застаріла, спробуйте ще раз.");
+            return;
+        }
+
+        if ("scomment:skip".equals(data)) {
+            statusChangeService.apply(pendingOpt.get(), null);
+            adminStatusCommentService.remove(userId);
+            answerCallbackWithText(callback.getId(), "Статус змінено.");
+        } else if ("scomment:write".equals(data)) {
+            adminStatusCommentService.setAwaitingText(userId);
             try {
                 telegramClient.execute(EditMessageText.builder()
                         .chatId(chatId)
-                        .messageId(messageId)
-                        .text(boardMsg.text())
+                        .messageId(callback.getMessage().getMessageId())
+                        .text("✏️ Напишіть коментар до заявки <b>#" + pendingOpt.get().requestId() + "</b>:")
                         .parseMode("HTML")
-                        .replyMarkup(boardMsg.keyboard())
                         .build());
             } catch (TelegramApiException e) {
-                log.warn("Failed to edit board message after status change", e);
+                log.warn("Failed to edit message for comment input", e);
             }
         }
-
-        answerCallbackWithText(callback.getId(), "Статус змінено: " + newStatus.getDisplayName());
     }
 
     private void handleBoardCallback(CallbackQuery callback, String data, Long userId, Long chatId) {

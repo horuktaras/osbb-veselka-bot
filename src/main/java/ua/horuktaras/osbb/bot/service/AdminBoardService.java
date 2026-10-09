@@ -95,7 +95,8 @@ public class AdminBoardService {
                 + "📝 <b>Опис:</b> " + escapeHtml(request.getDescription()) + "\n"
                 + "🙍 <b>Від:</b> " + userMention + "\n"
                 + "📅 <b>Подано:</b> " + createdStr + "\n\n"
-                + "Статус: " + request.getStatus().getDisplayName();
+                + "Статус: " + request.getStatus().getDisplayName()
+                + (request.getStatusComment() != null ? "\n💬 <b>Коментар:</b> " + escapeHtml(request.getStatusComment()) : "");
 
         InlineKeyboardMarkup keyboard = buildDetailKeyboard(request, returnPage, returnFilter);
         return new BoardMessage(text, keyboard);

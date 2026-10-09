@@ -118,6 +118,10 @@ public class AdminNotificationService {
         String text = "📋 Статус вашої заявки <b>#" + request.getId() + "</b> оновлено:\n\n"
                 + statusLine;
 
+        if (request.getStatusComment() != null) {
+            text += "\n\n💬 " + escapeHtml(request.getStatusComment());
+        }
+
         if (request.getStatus() == RequestStatus.CLOSED) {
             text += "\n\nДякуємо за звернення до ОСББ!";
         }
@@ -147,7 +151,8 @@ public class AdminNotificationService {
                 + "📝 <b>Опис:</b> " + escapeHtml(request.getDescription()) + "\n"
                 + "🙍 <b>Від:</b> " + userMention + "\n"
                 + "📅 <b>Подано:</b> " + request.getCreatedAt().format(FORMATTER) + "\n\n"
-                + "Статус: " + request.getStatus().getDisplayName();
+                + "Статус: " + request.getStatus().getDisplayName()
+                + (request.getStatusComment() != null ? "\n💬 <b>Коментар:</b> " + escapeHtml(request.getStatusComment()) : "");
     }
 
     private InlineKeyboardMarkup buildKeyboard(Request request) {

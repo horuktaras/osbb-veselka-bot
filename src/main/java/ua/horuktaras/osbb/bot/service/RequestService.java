@@ -33,9 +33,14 @@ public class RequestService {
     }
 
     public Request updateStatus(Long id, RequestStatus newStatus) {
+        return updateStatus(id, newStatus, null);
+    }
+
+    public Request updateStatus(Long id, RequestStatus newStatus, String comment) {
         Request request = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found: " + id));
         request.setStatus(newStatus);
+        request.setStatusComment(comment);
         return repository.save(request);
     }
 }

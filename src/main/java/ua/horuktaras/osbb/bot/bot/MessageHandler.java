@@ -17,9 +17,11 @@ import ua.horuktaras.osbb.bot.model.enums.ConversationStep;
 import ua.horuktaras.osbb.bot.model.enums.MediaType;
 import ua.horuktaras.osbb.bot.service.AdminBoardService;
 import ua.horuktaras.osbb.bot.service.AdminNotificationService;
+import ua.horuktaras.osbb.bot.service.AdminStatusCommentService;
 import ua.horuktaras.osbb.bot.service.AiDuplicateService;
 import ua.horuktaras.osbb.bot.service.ConversationService;
 import ua.horuktaras.osbb.bot.service.RequestService;
+import ua.horuktaras.osbb.bot.service.StatusChangeService;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -39,25 +41,46 @@ public class MessageHandler {
     private final AdminNotificationService adminNotificationService;
     private final AdminBoardService adminBoardService;
     private final AiDuplicateService aiDuplicateService;
+    private final AdminStatusCommentService adminStatusCommentService;
+    private final StatusChangeService statusChangeService;
 
     public MessageHandler(TelegramClient telegramClient,
                           ConversationService conversationService,
                           RequestService requestService,
                           AdminNotificationService adminNotificationService,
                           AdminBoardService adminBoardService,
-                          AiDuplicateService aiDuplicateService) {
+                          AiDuplicateService aiDuplicateService,
+                          AdminStatusCommentService adminStatusCommentService,
+                          StatusChangeService statusChangeService) {
         this.telegramClient = telegramClient;
         this.conversationService = conversationService;
         this.requestService = requestService;
         this.adminNotificationService = adminNotificationService;
         this.adminBoardService = adminBoardService;
         this.aiDuplicateService = aiDuplicateService;
+        this.adminStatusCommentService = adminStatusCommentService;
+        this.statusChangeService = statusChangeService;
     }
 
     public void handle(Message message) {
         Long userId = message.getFrom().getId();
         Long chatId = message.getChatId();
         String text = message.getText();
+
+        // Admin is typing a comment for a status change
+        if (adminStatusCommentService.isAwaitingText(userId)) {
+            if (text != null && !text.isBlank()) {
+                AdminStatusCommentService.PendingStatusChange pending = adminStatusCommentService.get(userId).orElse(null);
+                if (pending != null) {
+                    statusChangeService.apply(pending, text.trim());
+                    adminStatusCommentService.remove(userId);
+                    send(chatId, "✅ Статус змінено, коментар збережено.");
+                }
+            } else {
+                send(chatId, "Будь ласка, надішліть коментар текстом або скористайтесь /board щоб скасувати.");
+            }
+            return;
+        }
 
         // Handle commands
         if (text != null && text.startsWith("/")) {
@@ -98,6 +121,7 @@ public class MessageHandler {
                 }
             }
             case "/board" -> {
+                adminStatusCommentService.remove(userId);
                 if (adminBoardService.isAdmin(userId)) {
                     AdminBoardService.BoardMessage boardMsg = adminBoardService.buildBoardMessage(0, "ALL");
                     sendWithKeyboard(chatId, boardMsg.text(), boardMsg.keyboard());
