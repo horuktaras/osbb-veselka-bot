@@ -6,8 +6,10 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import ua.horuktaras.osbb.bot.model.entity.Request;
+import ua.horuktaras.osbb.bot.model.entity.RequestComment;
 import ua.horuktaras.osbb.bot.model.enums.RequestStatus;
 import ua.horuktaras.osbb.bot.repository.AdminUserRepository;
+import ua.horuktaras.osbb.bot.repository.RequestCommentRepository;
 import ua.horuktaras.osbb.bot.repository.RequestRepository;
 
 import java.time.format.DateTimeFormatter;
@@ -23,13 +25,18 @@ public class AdminBoardService {
     private static final DateTimeFormatter COMPACT_FMT = DateTimeFormatter.ofPattern("dd.MM HH:mm");
     private static final DateTimeFormatter FULL_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
+    private static final DateTimeFormatter COMMENT_FMT = DateTimeFormatter.ofPattern("dd.MM HH:mm");
+
     private final AdminUserRepository adminUserRepository;
     private final RequestRepository requestRepository;
+    private final RequestCommentRepository commentRepository;
 
     public AdminBoardService(AdminUserRepository adminUserRepository,
-                             RequestRepository requestRepository) {
+                             RequestRepository requestRepository,
+                             RequestCommentRepository commentRepository) {
         this.adminUserRepository = adminUserRepository;
         this.requestRepository = requestRepository;
+        this.commentRepository = commentRepository;
     }
 
     public boolean isAdmin(Long telegramId) {
@@ -87,19 +94,28 @@ public class AdminBoardService {
                 : "id:" + request.getTelegramUserId();
         String createdStr = request.getCreatedAt() != null ? request.getCreatedAt().format(FULL_FMT) : "";
 
-        String text = "<b>📋 Заявка #" + request.getId() + "</b>\n\n"
-                + "👤 <b>Ім'я:</b> " + escapeHtml(request.getName()) + "\n"
-                + "📞 <b>Контакт:</b> " + escapeHtml(request.getContact()) + "\n"
-                + "⚡ <b>Терміново:</b> " + urgencyMark + "\n"
-                + "🗂 <b>Тип:</b> " + request.getType().getDisplayName() + "\n"
-                + "📝 <b>Опис:</b> " + escapeHtml(request.getDescription()) + "\n"
-                + "🙍 <b>Від:</b> " + userMention + "\n"
-                + "📅 <b>Подано:</b> " + createdStr + "\n\n"
-                + "Статус: " + request.getStatus().getDisplayName()
-                + (request.getStatusComment() != null ? "\n💬 <b>Коментар:</b> " + escapeHtml(request.getStatusComment()) : "");
+        StringBuilder sb = new StringBuilder("<b>📋 Заявка #").append(request.getId()).append("</b>\n\n")
+                .append("👤 <b>Ім'я:</b> ").append(escapeHtml(request.getName())).append("\n")
+                .append("📞 <b>Контакт:</b> ").append(escapeHtml(request.getContact())).append("\n")
+                .append("⚡ <b>Терміново:</b> ").append(urgencyMark).append("\n")
+                .append("🗂 <b>Тип:</b> ").append(request.getType().getDisplayName()).append("\n")
+                .append("📝 <b>Опис:</b> ").append(escapeHtml(request.getDescription())).append("\n")
+                .append("🙍 <b>Від:</b> ").append(userMention).append("\n")
+                .append("📅 <b>Подано:</b> ").append(createdStr).append("\n\n")
+                .append("Статус: ").append(request.getStatus().getDisplayName());
+
+        List<RequestComment> comments = commentRepository.findByRequestIdOrderByCreatedAtAsc(request.getId());
+        if (!comments.isEmpty()) {
+            sb.append("\n\n💬 <b>Коментарі:</b>\n");
+            for (RequestComment c : comments) {
+                sb.append("• <i>").append(c.getCreatedAt().format(COMMENT_FMT)).append("</i> ")
+                  .append(c.getStatus().getDisplayName()).append(" — \"")
+                  .append(escapeHtml(c.getComment())).append("\"\n");
+            }
+        }
 
         InlineKeyboardMarkup keyboard = buildDetailKeyboard(request, returnPage, returnFilter);
-        return new BoardMessage(text, keyboard);
+        return new BoardMessage(sb.toString(), keyboard);
     }
 
     private InlineKeyboardMarkup buildListKeyboard(List<Request> pageRequests, int page, int totalPages, String filterStatus) {

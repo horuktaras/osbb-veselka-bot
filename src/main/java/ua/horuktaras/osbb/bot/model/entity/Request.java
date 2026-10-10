@@ -48,9 +48,6 @@ public class Request {
     @Column(nullable = false)
     private RequestStatus status = RequestStatus.NEW;
 
-    @Column(name = "status_comment", columnDefinition = "TEXT")
-    private String statusComment;
-
     @Column(name = "source_chat_id")
     private Long sourceChatId;
 
@@ -104,9 +101,6 @@ public class Request {
 
     public RequestStatus getStatus() { return status; }
     public void setStatus(RequestStatus status) { this.status = status; }
-
-    public String getStatusComment() { return statusComment; }
-    public void setStatusComment(String statusComment) { this.statusComment = statusComment; }
 
     public Long getSourceChatId() { return sourceChatId; }
     public void setSourceChatId(Long sourceChatId) { this.sourceChatId = sourceChatId; }

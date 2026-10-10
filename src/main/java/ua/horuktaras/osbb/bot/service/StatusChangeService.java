@@ -11,8 +11,10 @@ import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ua.horuktaras.osbb.bot.model.entity.Request;
+import ua.horuktaras.osbb.bot.model.entity.RequestComment;
 import ua.horuktaras.osbb.bot.model.enums.MediaType;
 import ua.horuktaras.osbb.bot.model.enums.RequestStatus;
+import ua.horuktaras.osbb.bot.repository.RequestCommentRepository;
 import ua.horuktaras.osbb.bot.service.AdminStatusCommentService.PendingStatusChange;
 
 @Service
@@ -21,15 +23,18 @@ public class StatusChangeService {
     private static final Logger log = LoggerFactory.getLogger(StatusChangeService.class);
 
     private final RequestService requestService;
+    private final RequestCommentRepository commentRepository;
     private final AdminNotificationService adminNotificationService;
     private final AdminBoardService adminBoardService;
     private final TelegramClient telegramClient;
 
     public StatusChangeService(RequestService requestService,
+                                RequestCommentRepository commentRepository,
                                 AdminNotificationService adminNotificationService,
                                 AdminBoardService adminBoardService,
                                 TelegramClient telegramClient) {
         this.requestService = requestService;
+        this.commentRepository = commentRepository;
         this.adminNotificationService = adminNotificationService;
         this.adminBoardService = adminBoardService;
         this.telegramClient = telegramClient;
@@ -41,13 +46,21 @@ public class StatusChangeService {
      * Otherwise treats it as a board detail message and re-renders in place.
      */
     public void apply(PendingStatusChange pending, String comment) {
-        Request updated = requestService.updateStatus(pending.requestId(), pending.newStatus(), comment);
+        Request updated = requestService.updateStatus(pending.requestId(), pending.newStatus());
+
+        if (comment != null && !comment.isBlank()) {
+            RequestComment rc = new RequestComment();
+            rc.setRequestId(updated.getId());
+            rc.setStatus(updated.getStatus());
+            rc.setComment(comment);
+            commentRepository.save(rc);
+        }
 
         boolean isAdminNotification = updated.getAdminChatMessageId() != null
                 && updated.getAdminChatMessageId().equals(pending.messageId().longValue());
 
         if (isAdminNotification) {
-            adminNotificationService.updateRequestMessage(updated);
+            adminNotificationService.updateRequestMessage(updated, comment);
         } else {
             AdminBoardService.BoardMessage boardMsg = adminBoardService.buildDetailMessage(updated, 0, "ALL");
             try {

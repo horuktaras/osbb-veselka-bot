@@ -81,7 +81,7 @@ public class AdminNotificationService {
         }
     }
 
-    public void updateRequestMessage(Request request) {
+    public void updateRequestMessage(Request request, String comment) {
         String adminChatId = botProperties.adminChatId();
         Integer messageId = request.getAdminChatMessageId().intValue();
         InlineKeyboardMarkup keyboard = buildKeyboard(request);
@@ -108,18 +108,18 @@ public class AdminNotificationService {
             log.error("Failed to update request #{} message in admin chat", request.getId(), e);
         }
 
-        notifyResident(request);
+        notifyResident(request, comment);
     }
 
-    private void notifyResident(Request request) {
+    private void notifyResident(Request request, String comment) {
         if (request.getSourceChatId() == null) return;
 
         String statusLine = request.getStatus().getDisplayName();
         String text = "📋 Статус вашої заявки <b>#" + request.getId() + "</b> оновлено:\n\n"
                 + statusLine;
 
-        if (request.getStatusComment() != null) {
-            text += "\n\n💬 " + escapeHtml(request.getStatusComment());
+        if (comment != null && !comment.isBlank()) {
+            text += "\n\n💬 " + escapeHtml(comment);
         }
 
         if (request.getStatus() == RequestStatus.CLOSED) {
@@ -152,7 +152,7 @@ public class AdminNotificationService {
                 + "🙍 <b>Від:</b> " + userMention + "\n"
                 + "📅 <b>Подано:</b> " + request.getCreatedAt().format(FORMATTER) + "\n\n"
                 + "Статус: " + request.getStatus().getDisplayName()
-                + (request.getStatusComment() != null ? "\n💬 <b>Коментар:</b> " + escapeHtml(request.getStatusComment()) : "");
+                ;
     }
 
     private InlineKeyboardMarkup buildKeyboard(Request request) {
